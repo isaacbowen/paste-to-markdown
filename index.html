@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clipboard HTML to Markdown Converter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #markdown-output {
+      width: 100%;
+      height: 300px;
+    }
+    button {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Clipboard HTML to Markdown Converter</h1>
+
+<button id="convert-button">Convert Clipboard Content to Markdown</button>
+<br>
+<textarea id="markdown-output" placeholder="Paste HTML here or click the button..."></textarea>
+
+<!-- Include Turndown via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.min.js"></script>
+<script>
+  // Function to convert HTML content to Markdown
+  function convertContent(htmlContent) {
+    // Initialize TurndownService with options
+    const turndownService = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      emDelimiter: '*',
+      strongDelimiter: '**',
+      bulletListMarker: '-',
+    });
+
+    // Custom rule to handle headings
+    turndownService.addRule('customHeadings', {
+      filter: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+      replacement: function (content, node) {
+        const hLevel = Number(node.nodeName.charAt(1));
+        const hPrefix = Array(hLevel + 1).join('#') + ' ';
+        const textContent = node.textContent.trim();
+        return '\n\n' + hPrefix + textContent + '\n\n';
+      }
+    });
+
+    // Add rules to handle inline styles like italic, bold, and underline
+    turndownService.addRule('italicText', {
+      filter: function (node) {
+        return (
+          (node.nodeName === 'SPAN' && node.style.fontStyle === 'italic') ||
+          node.nodeName === 'I' ||
+          node.nodeName === 'EM'
+        );
+      },
+      replacement: function (content) {
+        return '*' + content + '*';
+      }
+    });
+
+    turndownService.addRule('boldText', {
+      filter: function (node) {
+        return (
+          (node.nodeName === 'SPAN' && node.style.fontWeight === 'bold') ||
+          node.nodeName === 'B' ||
+          node.nodeName === 'STRONG'
+        );
+      },
+      replacement: function (content) {
+        return '**' + content + '**';
+      }
+    });
+
+    turndownService.addRule('underlineText', {
+      filter: function (node) {
+        return (
+          (node.nodeName === 'SPAN' && node.style.textDecoration.includes('underline')) ||
+          node.nodeName === 'U'
+        );
+      },
+      replacement: function (content) {
+        return '<u>' + content + '</u>';
+      }
+    });
+
+    // Add a rule to ignore empty links
+    turndownService.addRule('ignoreEmptyLinks', {
+      filter: function (node) {
+        return (
+          node.nodeName === 'A' &&
+          (!node.textContent || node.textContent.trim() === '')
+        );
+      },
+      replacement: function () {
+        return ''; // Remove the link entirely
+      }
+    });
+
+    // Convert HTML to Markdown
+    let markdown = turndownService.turndown(htmlContent);
+
+    // hr
+    markdown = markdown.replaceAll(/^\\?-{2,}/mg, '* * *');
+    
+    // Replace '--' with '—' (em dash)
+    markdown = markdown.replace(/--/g, '—');
+
+    return markdown;
+  }
+
+  // Event listener for the button click
+  document.getElementById('convert-button').addEventListener('click', async () => {
+    try {
+      // Request permission to read from the clipboard
+      const permissionStatus = await navigator.permissions.query({ name: 'clipboard-read' });
+
+      if (permissionStatus.state === 'denied') {
+        alert('Permission to access clipboard denied!');
+        return;
+      }
+
+      // Read HTML content from the clipboard
+      const clipboardItems = await navigator.clipboard.read();
+      let htmlContent = '';
+
+      for (const item of clipboardItems) {
+        if (item.types.includes('text/html')) {
+          const blob = await item.getType('text/html');
+          htmlContent = await blob.text();
+          break;
+        } else if (item.types.includes('text/plain')) {
+          // Fallback to plain text if HTML is not available
+          const blob = await item.getType('text/plain');
+          htmlContent = await blob.text();
+          break;
+        }
+      }
+
+      if (!htmlContent) {
+        alert('No HTML content found in clipboard!');
+        return;
+      }
+
+      // Convert content and display
+      const markdown = convertContent(htmlContent);
+      document.getElementById('markdown-output').value = markdown;
+
+    } catch (err) {
+      console.error('Failed to read clipboard contents: ', err);
+      alert('Failed to read clipboard contents: ' + err);
+    }
+  });
+
+  // Event listener for paste into the textarea
+  document.getElementById('markdown-output').addEventListener('paste', (event) => {
+    event.preventDefault();
+    try {
+      const clipboardData = event.clipboardData || window.clipboardData;
+      let htmlContent = '';
+
+      if (clipboardData.types.includes('text/html')) {
+        htmlContent = clipboardData.getData('text/html');
+      } else if (clipboardData.types.includes('text/plain')) {
+        htmlContent = clipboardData.getData('text/plain');
+      }
+
+      if (!htmlContent) {
+        alert('No content found in clipboard!');
+        return;
+      }
+
+      // Convert content and display
+      const markdown = convertContent(htmlContent);
+      event.target.value = markdown;
+
+    } catch (err) {
+      console.error('Failed to process pasted content: ', err);
+      alert('Failed to process pasted content: ' + err);
+    }
+  });
+</script>
+
+</body>
+</html>
