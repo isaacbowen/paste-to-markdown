@@ -84,7 +84,7 @@
     // Find all paragraphs
     const allParagraphs = doc.querySelectorAll('p');
 
-    // Filter paragraphs that have 'white-space: pre-wrap' in their style or ancestor's style
+    // Filter paragraphs that have 'white-space: pre-wrap' in their own style or in any ancestor's style
     const preWrapParagraphs = Array.from(allParagraphs).filter(p => hasPreWrapAncestor(p));
 
     preWrapParagraphs.forEach(p => {
@@ -121,13 +121,14 @@
       emDelimiter: '*',
       strongDelimiter: '**',
       bulletListMarker: '-',
+      br: '\\\n', // Use backslash and newline for line breaks
     });
 
     // Custom rule to handle <br> tags
     turndownService.addRule('lineBreak', {
       filter: 'br',
       replacement: function (content, node, options) {
-        return '  \n'; // Two spaces and a newline for Markdown line break
+        return '\\\n'; // Backslash and a newline for Markdown line break
       }
     });
 
