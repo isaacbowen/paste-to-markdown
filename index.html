@@ -3,33 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <title>Clipboard HTML to Markdown Converter</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 50px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 30px;
+    }
+    h1 {
+      text-align: center;
+      color: #333333;
+      margin-bottom: 30px;
+    }
+    #convert-button {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      font-size: 16px;
+      background-color: #6200ea;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    #convert-button:hover {
+      background-color: #3700b3;
     }
     #markdown-output {
       width: 100%;
-      height: 300px;
-    }
-    button {
-      margin-bottom: 10px;
+      height: 400px;
+      padding: 15px;
+      font-size: 14px;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      resize: vertical;
+      box-sizing: border-box
     }
   </style>
 </head>
 <body>
 
-<h1>Clipboard HTML to Markdown Converter</h1>
+<div class="container">
+  <h1>Clipboard HTML to Markdown Converter</h1>
 
-<button id="convert-button">Convert Clipboard Content to Markdown</button>
-<br>
-<textarea id="markdown-output" placeholder="Paste HTML here or click the button..."></textarea>
+  <textarea id="markdown-output" placeholder="Paste HTML here!"></textarea>
+</div>
 
 <!-- Include Turndown via CDN -->
 <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.min.js"></script>
 <script>
+  // Function to preprocess HTML content
+  function preprocessHTML(htmlContent) {
+    // Create a DOM parser
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+
+    // Find all paragraphs with style="white-space: pre-wrap;"
+    const preWrapParagraphs = doc.querySelectorAll('p[style*="white-space: pre-wrap"]');
+
+    preWrapParagraphs.forEach(p => {
+      // Replace line breaks (\n) in text nodes with <br> elements
+      const childNodes = Array.from(p.childNodes);
+      childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const lines = node.textContent.split(/\r\n|\n|\r/);
+          const fragment = doc.createDocumentFragment();
+          lines.forEach((line, index) => {
+            fragment.appendChild(doc.createTextNode(line));
+            if (index < lines.length - 1) {
+              fragment.appendChild(doc.createElement('br'));
+            }
+          });
+          p.replaceChild(fragment, node);
+        }
+      });
+    });
+
+    // Serialize the modified document back to HTML
+    return doc.body.innerHTML;
+  }
+
   // Function to convert HTML content to Markdown
   function convertContent(htmlContent) {
+    // Preprocess HTML content
+    htmlContent = preprocessHTML(htmlContent);
+
     // Initialize TurndownService with options
     const turndownService = new TurndownService({
       headingStyle: 'atx',
@@ -37,6 +106,14 @@
       emDelimiter: '*',
       strongDelimiter: '**',
       bulletListMarker: '-',
+    });
+
+    // Custom rule to handle <br> tags
+    turndownService.addRule('lineBreak', {
+      filter: 'br',
+      replacement: function (content, node, options) {
+        return '  \n'; // Two spaces and a newline for Markdown line break
+      }
     });
 
     // Custom rule to handle headings
@@ -67,7 +144,7 @@
     turndownService.addRule('boldText', {
       filter: function (node) {
         return (
-          (node.nodeName === 'SPAN' && node.style.fontWeight === 'bold') ||
+          (node.nodeName === 'SPAN' && (node.style.fontWeight === 'bold' || parseInt(node.style.fontWeight) >= 700)) ||
           node.nodeName === 'B' ||
           node.nodeName === 'STRONG'
         );
@@ -106,59 +183,16 @@
     let markdown = turndownService.turndown(htmlContent);
 
     // hr
-    markdown = markdown.replaceAll(/^\\?-{2,}/mg, '* * *');
-    
+    markdown = markdown.replace(/^\\?-{2,}/mg, '* * *');
+
     // Replace '--' with '—' (em dash)
     markdown = markdown.replace(/--/g, '—');
 
-    return markdown;
+    return markdown.trim();
   }
 
-  // Event listener for the button click
-  document.getElementById('convert-button').addEventListener('click', async () => {
-    try {
-      // Request permission to read from the clipboard
-      const permissionStatus = await navigator.permissions.query({ name: 'clipboard-read' });
-
-      if (permissionStatus.state === 'denied') {
-        alert('Permission to access clipboard denied!');
-        return;
-      }
-
-      // Read HTML content from the clipboard
-      const clipboardItems = await navigator.clipboard.read();
-      let htmlContent = '';
-
-      for (const item of clipboardItems) {
-        if (item.types.includes('text/html')) {
-          const blob = await item.getType('text/html');
-          htmlContent = await blob.text();
-          break;
-        } else if (item.types.includes('text/plain')) {
-          // Fallback to plain text if HTML is not available
-          const blob = await item.getType('text/plain');
-          htmlContent = await blob.text();
-          break;
-        }
-      }
-
-      if (!htmlContent) {
-        alert('No HTML content found in clipboard!');
-        return;
-      }
-
-      // Convert content and display
-      const markdown = convertContent(htmlContent);
-      document.getElementById('markdown-output').value = markdown;
-
-    } catch (err) {
-      console.error('Failed to read clipboard contents: ', err);
-      alert('Failed to read clipboard contents: ' + err);
-    }
-  });
-
-  // Event listener for paste into the textarea
-  document.getElementById('markdown-output').addEventListener('paste', (event) => {
+  // Event listener for paste events anywhere on the page
+  document.addEventListener('paste', (event) => {
     event.preventDefault();
     try {
       const clipboardData = event.clipboardData || window.clipboardData;
@@ -177,7 +211,7 @@
 
       // Convert content and display
       const markdown = convertContent(htmlContent);
-      event.target.value = markdown;
+      document.getElementById('markdown-output').value = markdown;
 
     } catch (err) {
       console.error('Failed to process pasted content: ', err);
