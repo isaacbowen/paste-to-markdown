@@ -2,24 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Markdown.be - Clipboard HTML to Markdown Converter</title>
-  <!-- Meta Tags for SEO -->
-  <meta name="description" content="Convert clipboard HTML to Markdown effortlessly at Markdown.be. Paste your HTML and get clean, formatted Markdown.">
-  <meta name="keywords" content="Markdown converter, HTML to Markdown, clipboard converter, Markdown.be">
-  <meta name="author" content="Markdown.be">
-  <!-- Open Graph Meta Tags -->
-  <meta property="og:title" content="Markdown.be - Clipboard HTML to Markdown Converter">
-  <meta property="og:description" content="Convert clipboard HTML to Markdown effortlessly at Markdown.be. Paste your HTML and get clean, formatted Markdown.">
-  <meta property="og:url" content="https://markdown.be">
-  <meta property="og:type" content="website">
-  <!-- Twitter Card Meta Tags -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Markdown.be - Clipboard HTML to Markdown Converter">
-  <meta name="twitter:description" content="Convert clipboard HTML to Markdown effortlessly at Markdown.be. Paste your HTML and get clean, formatted Markdown.">
-  <!-- Google Fonts -->
+  <title>Enhanced Markdown Converter</title>
+  <meta name="description" content="Convert clipboard HTML to Markdown with enhanced formatting preservation">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
   <style>
-    /* Global box-sizing */
     *, *::before, *::after {
       box-sizing: border-box;
     }
@@ -28,6 +16,7 @@
       margin: 0;
       padding: 0;
       background-color: #f5f5f5;
+      line-height: 1.6;
     }
     .container {
       max-width: 800px;
@@ -40,198 +29,267 @@
     h1 {
       text-align: center;
       color: #333333;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
+    }
+    .description {
+      text-align: center;
+      color: #666;
+      margin-bottom: 20px;
     }
     #markdown-output {
       width: 100%;
       height: 400px;
       padding: 15px;
+      font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
       font-size: 14px;
+      line-height: 1.6;
       border: 1px solid #cccccc;
       border-radius: 4px;
       resize: vertical;
+      white-space: pre-wrap;
+    }
+    .keyboard-shortcuts {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
-
 <div class="container">
-  <h1>Markdown.be - Clipboard HTML to Markdown Converter</h1>
-  <p>Paste your HTML content below, and we'll convert it to clean, formatted Markdown for you!</p>
-  <textarea id="markdown-output" placeholder="Paste HTML here!"></textarea>
+  <h1>Enhanced Markdown Converter</h1>
+  <p class="description">Paste formatted text to convert it to clean, properly formatted Markdown!</p>
+  <textarea id="markdown-output" placeholder="Paste your formatted text here (Cmd+V or Ctrl+V)&#10;Use Cmd+Shift+V or Ctrl+Shift+V to paste without conversion"></textarea>
+  <div class="keyboard-shortcuts">
+    <strong>Keyboard Shortcuts:</strong>
+    <ul>
+      <li>Normal paste (with conversion): Cmd+V (Mac) or Ctrl+V (Windows)</li>
+      <li>Plain text paste (no conversion): Cmd+Shift+V (Mac) or Ctrl+Shift+V (Windows)</li>
+      <li>Press Escape: Clear if empty, or select all text</li>
+    </ul>
+  </div>
 </div>
 
-<!-- Include Turndown via CDN -->
-<script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.min.js"></script>
 <script>
-  // Function to check if an element has 'white-space: pre-wrap' in its inline style
-  function hasPreWrapAncestor(node) {
-    while (node && node !== node.ownerDocument.documentElement) {
-      if (node.style && node.style.whiteSpace === 'pre-wrap') {
-        return true;
-      }
-      node = node.parentElement;
+function hasPreWrapAncestor(node) {
+  while (node && node !== node.ownerDocument.documentElement) {
+    if (node.style && node.style.whiteSpace === 'pre-wrap') {
+      return true;
     }
-    return false;
+    node = node.parentElement;
   }
+  return false;
+}
 
-  // Function to preprocess HTML content
-  function preprocessHTML(htmlContent) {
-    // Create a DOM parser
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlContent, 'text/html');
+function preserveSpaces(text) {
+  return text.replace(/ /g, '&nbsp;');
+}
 
-    // Find all paragraphs
-    const allParagraphs = doc.querySelectorAll('p');
-
-    // Filter paragraphs that have 'white-space: pre-wrap' in their own style or in any ancestor's style
-    const preWrapParagraphs = Array.from(allParagraphs).filter(p => hasPreWrapAncestor(p));
-
-    preWrapParagraphs.forEach(p => {
-      // Replace line breaks (\n) in text nodes with <br> elements
-      const childNodes = Array.from(p.childNodes);
-      childNodes.forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const lines = node.textContent.split(/\r\n|\n|\r/);
-          const fragment = doc.createDocumentFragment();
-          lines.forEach((line, index) => {
-            fragment.appendChild(doc.createTextNode(line));
-            if (index < lines.length - 1) {
-              fragment.appendChild(doc.createElement('br'));
-            }
-          });
-          p.replaceChild(fragment, node);
-        }
-      });
-    });
-
-    // Serialize the modified document back to HTML
-    return doc.body.innerHTML;
-  }
-
-  // Function to convert HTML content to Markdown
-  function convertContent(htmlContent) {
-    // Preprocess HTML content
-    htmlContent = preprocessHTML(htmlContent);
-
-    // Initialize TurndownService with options
-    const turndownService = new TurndownService({
-      headingStyle: 'atx',
-      codeBlockStyle: 'fenced',
-      emDelimiter: '*',
-      strongDelimiter: '**',
-      bulletListMarker: '-',
-      br: '\\\n', // Use backslash and newline for line breaks
-    });
-
-    // Custom rule to handle <br> tags
-    turndownService.addRule('lineBreak', {
-      filter: 'br',
-      replacement: function (content, node, options) {
-        return '\\\n'; // Backslash and a newline for Markdown line break
-      }
-    });
-
-    // Custom rule to handle headings
-    turndownService.addRule('customHeadings', {
-      filter: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-      replacement: function (content, node) {
-        const hLevel = Number(node.nodeName.charAt(1));
-        const hPrefix = Array(hLevel + 1).join('#') + ' ';
-        const textContent = node.textContent.trim();
-        return '\n\n' + hPrefix + textContent + '\n\n';
-      }
-    });
-
-    // Add rules to handle inline styles like italic, bold, and underline
-    turndownService.addRule('italicText', {
-      filter: function (node) {
-        return (
-          (node.nodeName === 'SPAN' && node.style.fontStyle === 'italic') ||
-          node.nodeName === 'I' ||
-          node.nodeName === 'EM'
-        );
-      },
-      replacement: function (content) {
-        return '*' + content + '*';
-      }
-    });
-
-    turndownService.addRule('boldText', {
-      filter: function (node) {
-        return (
-          (node.nodeName === 'SPAN' && (node.style.fontWeight === 'bold' || parseInt(node.style.fontWeight) >= 700)) ||
-          node.nodeName === 'B' ||
-          node.nodeName === 'STRONG'
-        );
-      },
-      replacement: function (content) {
-        return '**' + content + '**';
-      }
-    });
-
-    turndownService.addRule('underlineText', {
-      filter: function (node) {
-        return (
-          (node.nodeName === 'SPAN' && node.style.textDecoration.includes('underline')) ||
-          node.nodeName === 'U'
-        );
-      },
-      replacement: function (content) {
-        return '<u>' + content + '</u>';
-      }
-    });
-
-    // Add a rule to ignore empty links
-    turndownService.addRule('ignoreEmptyLinks', {
-      filter: function (node) {
-        return (
-          node.nodeName === 'A' &&
-          (!node.textContent || node.textContent.trim() === '')
-        );
-      },
-      replacement: function () {
-        return ''; // Remove the link entirely
-      }
-    });
-
-    // Convert HTML to Markdown
-    let markdown = turndownService.turndown(htmlContent);
-
-    // Replace '--' with '—' (em dash)
-    markdown = markdown.replace(/--/g, '—');
-
-    return markdown.trim();
-  }
-
-  // Event listener for paste events anywhere on the page
-  document.addEventListener('paste', (event) => {
-    event.preventDefault();
-    try {
-      const clipboardData = event.clipboardData || window.clipboardData;
-      let htmlContent = '';
-
-      if (clipboardData.types.includes('text/html')) {
-        htmlContent = clipboardData.getData('text/html');
-      } else if (clipboardData.types.includes('text/plain')) {
-        htmlContent = clipboardData.getData('text/plain');
-      }
-
-      if (!htmlContent) {
-        alert('No content found in clipboard!');
-        return;
-      }
-
-      // Convert content and display
-      const markdown = convertContent(htmlContent);
-      document.getElementById('markdown-output').value = markdown;
-
-    } catch (err) {
-      console.error('Failed to process pasted content: ', err);
-      alert('Failed to process pasted content: ' + err);
-    }
+function preprocessHTML(htmlContent) {
+  const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
+    ALLOWED_TAGS: [
+      'p', 'span', 'i', 'em', 'strong', 'b', 'br', 'a', 'u',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+    ],
+    ALLOWED_ATTR: ['style', 'class', 'href'],
+    ALLOW_DATA_ATTR: false,
+    ADD_TAGS: ['wbr'],
+    USE_PROFILES: { html: true }
   });
-</script>
 
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(sanitizedHtml, 'text/html');
+
+  const allParagraphs = doc.querySelectorAll('p');
+  const preWrapParagraphs = Array.from(allParagraphs).filter(p =>
+    hasPreWrapAncestor(p)
+  );
+
+  preWrapParagraphs.forEach(p => {
+    const childNodes = Array.from(p.childNodes);
+    childNodes.forEach(node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const lines = node.textContent.split(/\r\n|\n|\r/);
+        const fragment = doc.createDocumentFragment();
+
+        lines.forEach((line, index) => {
+          const leadingSpaces = line.match(/^[ ]*/)[0];
+          const content = line.slice(leadingSpaces.length);
+
+          if (leadingSpaces) {
+            const spaceSpan = doc.createElement('span');
+            spaceSpan.style.whiteSpace = 'pre';
+            spaceSpan.innerHTML = preserveSpaces(leadingSpaces);
+            fragment.appendChild(spaceSpan);
+          }
+
+          if (content) {
+            fragment.appendChild(doc.createTextNode(content));
+          }
+
+          if (index < lines.length - 1) {
+            fragment.appendChild(doc.createElement('br'));
+          }
+        });
+
+        p.replaceChild(fragment, node);
+      }
+    });
+  });
+
+  return doc.body.innerHTML;
+}
+
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  codeBlockStyle: 'fenced',
+  emDelimiter: '*',
+  strongDelimiter: '**',
+  bulletListMarker: '-',
+  br: '\\\n'
+});
+
+turndownService.addRule('preserveSpaces', {
+  filter: function(node) {
+    return node.nodeName === 'SPAN' && node.style.whiteSpace === 'pre';
+  },
+  replacement: function(content) {
+    return content;
+  }
+});
+
+turndownService.addRule('lineBreak', {
+  filter: 'br',
+  replacement: function(content, node, options) {
+    return '\\\n';
+  }
+});
+
+turndownService.addRule('customHeadings', {
+  filter: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+  replacement: function(content, node) {
+    const hLevel = Number(node.nodeName.charAt(1));
+    const hPrefix = '#'.repeat(hLevel) + ' ';
+    const textContent = node.textContent.trim();
+    return '\n\n' + hPrefix + textContent + '\n\n';
+  }
+});
+
+turndownService.addRule('italicText', {
+  filter: function(node) {
+    return (
+      (node.nodeName === 'SPAN' && node.style.fontStyle === 'italic') ||
+      node.nodeName === 'I' ||
+      node.nodeName === 'EM'
+    );
+  },
+  replacement: function(content) {
+    return '*' + content + '*';
+  }
+});
+
+turndownService.addRule('boldText', {
+  filter: function(node) {
+    return (
+      (node.nodeName === 'SPAN' &&
+       (node.style.fontWeight === 'bold' ||
+        parseInt(node.style.fontWeight) >= 700)) ||
+      node.nodeName === 'B' ||
+      node.nodeName === 'STRONG'
+    );
+  },
+  replacement: function(content) {
+    return '**' + content + '**';
+  }
+});
+
+turndownService.addRule('underlineText', {
+  filter: function(node) {
+    return (
+      (node.nodeName === 'SPAN' &&
+       node.style.textDecoration.includes('underline')) ||
+      node.nodeName === 'U'
+    );
+  },
+  replacement: function(content) {
+    return '<u>' + content + '</u>';
+  }
+});
+
+turndownService.addRule('ignoreEmptyLinks', {
+  filter: function(node) {
+    return (
+      node.nodeName === 'A' &&
+      (!node.textContent || node.textContent.trim() === '')
+    );
+  },
+  replacement: function() {
+    return '';
+  }
+});
+
+const textarea = document.getElementById('markdown-output');
+
+textarea.addEventListener('keydown', function(event) {
+  if (event.key === 'Escape') {
+    if (textarea.value.trim() === '') {
+      if (textarea.style.height !== 'auto') {
+        textarea.style.height = 'auto';
+      } else {
+        textarea.blur();
+      }
+    } else {
+      textarea.select();
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+    }
+  }
+});
+
+textarea.addEventListener('input', function() {
+  if (textarea.scrollHeight > textarea.clientHeight) {
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
+});
+
+textarea.addEventListener('paste', (event) => {
+  // Check for Cmd+Shift+V (Mac) or Ctrl+Shift+V (Windows)
+  if (event.shiftKey && (event.metaKey || event.ctrlKey)) {
+    return; // Let browser handle plain text paste
+  }
+
+  const clipboardData = event.clipboardData || window.clipboardData;
+  const htmlContent = clipboardData.getData('text/html');
+
+  // Skip conversion for certain types of content
+  if (!htmlContent || clipboardData.types.includes('application/vnd.code.copymetadata')) {
+    return;
+  }
+
+  event.preventDefault();
+
+  // Process the HTML content
+  const processedHTML = preprocessHTML(htmlContent);
+  let markdown = turndownService.turndown(processedHTML);
+
+  // Post-processing
+  markdown = markdown
+    .replace(/^\\?-{3,}/gm, '---') // Preserve horizontal rules
+    .replace(/([^-]|^)--([^-]|$)/g, '$1—$2'); // Convert -- to em dash only when not part of ---
+
+  // Insert the markdown at cursor position
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const textBefore = textarea.value.substring(0, start);
+  const textAfter = textarea.value.substring(end);
+
+  textarea.value = textBefore + markdown + textAfter;
+  textarea.selectionStart = textarea.selectionEnd = start + markdown.length;
+
+  // Trigger input event for auto-resize
+  textarea.dispatchEvent(new Event('input'));
+});
+</script>
 </body>
 </html>
